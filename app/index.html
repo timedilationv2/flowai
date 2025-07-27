@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowAI Frontend</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+    }
+    .container {
+      max-width: 600px;
+      margin: auto;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 0.5rem;
+      margin-bottom: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      border: none;
+      background-color: #007bff;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>FlowAI</h1>
+    <p>This is a placeholder frontend for the FlowAI application.</p>
+    <input type="text" id="userInput" placeholder="Type a message"/>
+    <button onclick="sendMessage()">Send</button>
+    <pre id="response"></pre>
+  </div>
+  <script>
+    function sendMessage() {
+      const input = document.getElementById('userInput').value;
+      const responseEl = document.getElementById('response');
+      // Placeholder for backend integration
+      responseEl.textContent = 'You typed: ' + input + '\n(Backend integration coming soon)';
+    }
+  </script>
+</body>
+</html>
