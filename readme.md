@@ -33,8 +33,6 @@ This exposes the application at `http://localhost:8080/`.
 
 thoughts day 1 ~
 
-Of course. Here is the complete first-day report formatted as a clean Markdown script, ready to be saved or pasted.
-
 ```markdown
 **MEMORANDUM**
 
