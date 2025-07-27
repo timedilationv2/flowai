@@ -1,0 +1,671 @@
+# VibePilot — Developer Memory OS + Copilot
+
+**Pro‑log and Prompt Chain (Markdown, scrape‑ready)**
+
+---
+
+## Prompt 1 — Background and Positioning
+
+**Goal:** Frame why this exists and how it differs from Codex/Copilot.
+
+**Context:**
+Codex/Copilot is excellent at:
+
+* Code completion and suggestion (functions, logic blocks, entire files)
+* Docstring and comment generation
+* Test case generation
+* Inline bug‑fix suggestions and refactors
+* Code conversion between languages
+* Repo exploration inside IDEs and GitHub PR workflows
+
+**Limitations for this use case:**
+
+* Not optimized for multi‑step reasoning chains or agentic systems
+* Not designed for cross‑repo orchestration, memory of work history, or workspace state management
+* Weak at ambient capture of screenshots, shells, containers, and “what I was doing” threads
+
+**Product thesis:**
+Build a local‑first “Developer Memory OS + Copilot” that captures ambient context (code, prompts, shells, screenshots, containers), organizes it into a recallable memory thread, and provides one‑command “resume where I left off.”
+
+---
+
+## Prompt 2 — Product Definition (VibePilot)
+
+**Goal:** Define scope and first principles.
+
+**Core concept:**
+A local or cloud‑optional system that:
+
+* Remembers what you were doing (code, folders, files, prompts, LLMs, bugs, tasks)
+* Understands workspace state (intent, progress, environment)
+* Organizes artifacts (screenshots, notes, sessions, container profiles)
+* Interacts via CLI/TUI, lightweight web UI, or IDE hooks
+* Auto‑documents work and proposes next actions
+* Spins up tools on demand (containers, VS Code, Jupyter, webtop)
+
+**System philosophy:**
+
+* Local‑first, privacy‑preserving
+* Snapshots and memory over checklists
+* Quiet until summoned
+* Append‑only event log, simple queries first (FTS5), vectors later if needed
+
+---
+
+## Prompt 3 — Core Modules
+
+**Goal:** Name the building blocks and their responsibilities.
+
+* Memory Thread Engine: append‑only event log, sessions, recall queries
+* Workspace Organizer: folders, code files, screenshots, environment state
+* Auto‑Doc Engine: README/CHANGELOG/session log generators
+* Copilot Chat (LLM): debug, refactor, launch containers, recall memory
+* Prompt Timeline: models, prompts, responses, versions
+* Bug Tracker & Fix Assistant: log bugs, link to artifacts and commits
+* VDev Shell (CLI/TUI): control plane for capture, recall, export
+* Container Layer: compose templates, start/stop logs, profiles
+* Context Layer: metadata linking files, prompts, tasks, sessions
+
+---
+
+## Prompt 4 — Vibe Coder Features (User Stories)
+
+**Goal:** Define high‑value interactions.
+
+* “What was I doing?” → return last 5 tasks, recent diffs, next steps
+* “Which LLM did I use here?” → list model, prompts, referenced files
+* “Weekly timeline” → screenshots, code, bugs, tasks, prompts
+* “Spin up last environment for <Project>” → container profile resume
+* “Auto‑write README and commit message from last session”
+* “Open virtual workspace for <Project> with last known tabs”
+* “Tag this code block as needs‑refactor”
+* “Screenshot + log with timestamp + file context”
+* “Generate a flowchart of what I built in this folder”
+
+---
+
+## Prompt 5 — MVP Architecture (Local‑first)
+
+**Goal:** Implementable shape with clear boundaries.
+
+```
++-------------------------+        +-------------------------+
+|  CLI / TUI (vibectl)    | <----> | Memory API (local http) |
+|  recall, log, tasks     |        | FastAPI (or Express)     |
++-----------+-------------+        +-----------+-------------+
+            |                                   |
+            v                                   v
+   +-----------------+                  +---------------------+
+   | Event Adapters  |                  | SQLite (FTS5)       |
+   | git, shell, LLM |  JSONL -> SQL    | tables + FTS views  |
+   +--------+--------+                  +---------------------+
+            |                                   ^
+            v                                   |
+   +-----------------+                  +-------+---------+
+   | Artifact Store  |<-----------------| File watcher    |
+   | screenshots,    |  paths & meta    | & ingester      |
+   | notes, blobs    |                  +-----------------+
+   +-----------------+
+```
+
+**Principles:**
+
+* Append‑only events → normalized tables → FTS5 search
+* Adapters for capture; API for query; CLI/UI for control
+* Upgradable: VS Code extension, Docker orchestration, vectors later
+
+---
+
+## Prompt 6 — Data Model (SQLite, FTS5)
+
+**Goal:** Minimum schema that maps 1:1 to features.
+
+Tables (prefix `vp_`):
+
+* `vp_event(id, ts, source, type, project, path, payload_json)`
+  Types: `git.commit`, `git.branch`, `shell.cmd`, `llm.prompt`, `task.create`, `task.update`, `screenshot.save`, `bug.log`, `container.start`, `container.stop`.
+
+* `vp_task(id, title, status, priority, project, created_at, updated_at, assignee, parent_id, tags_json, links_json)`
+  Status: `todo|doing|blocked|done`.
+
+* `vp_bug(id, title, status, severity, project, created_at, updated_at, repro_steps, links_json)`
+
+* `vp_prompt_run(id, ts, model, temperature, project, prompt_text, context_paths_json, response_meta_json, cost_estimate)`
+
+* `vp_artifact(id, kind, path, project, created_at, meta_json)`
+  Kinds: `screenshot|doc|note|log|build`.
+
+* `vp_session(id, project, started_at, ended_at, summary_text, links_json)`
+
+FTS5 view/table:
+
+* `vp_search_index(content, ref_type, ref_id)` built from prompts, notes, commit messages, bug text, and artifact annotations/OCR (OCR optional later).
+
+---
+
+## Prompt 7 — Event Capture and Adapters
+
+**Goal:** Small, composable adapters, lowest friction first.
+
+* Git: post‑commit hook → `vp_event(git.commit)` with hash, files, message
+* Shell: `vibectl exec <cmd>` logs command + exit code
+* LLM proxy: local HTTP stub compatible with OpenAI/Claude; log model, prompt, context files
+* Screenshot: `vibectl snap [--note "..."]` saves timestamped PNG to `data/artifacts/`, records `vp_artifact` (OCR optional)
+* File watcher: chokidar/watchdog on `projects/*`, debounce bursts to reduce noise
+* Later: VS Code extension capture (active file, selection), Docker adapter
+
+---
+
+## Prompt 8 — Interfaces
+
+**Goal:** Primary control via CLI; lightweight web UI later.
+
+CLI commands:
+
+* `vibectl init <project>`
+* `vibectl todo "Title" [--project X]`
+* `vibectl doing <taskId>`, `vibectl done <taskId>`
+* `vibectl recall [--since 2d] [--project X]`
+* `vibectl resume [--project X]`
+* `vibectl prompt --model <m> --ctx src/ api/ -- "prompt text"`
+* `vibectl snap [--note "..."]`
+* `vibectl bug "Crash on save" --repro steps.md`
+* `vibectl container up <profile> | down <profile> | logs <profile>`
+* `vibectl export --since 7d --format md`
+
+Web UI (later): Vite + React + Tailwind
+
+* Views: Timeline, Tasks, Prompt Runs, Artifacts, Recall
+* Backed by local Memory API
+
+---
+
+## Prompt 9 — Recall Logic
+
+**Goal:** Ship a valuable “what was I doing” answer.
+
+Process:
+
+* Resolve time window + project
+* Fetch or synthesize latest session from events
+* Group by task (links/filenames overlap)
+* Rank: `doing > blocked > todo`, then recency
+
+Return:
+
+* Session summary (5 lines)
+* Top 5 next actions (unfinished tasks, recent files, open bugs)
+* LLM context pack (last N prompt snippets + paths)
+
+Search:
+
+* SQLite FTS5 across prompts, commit messages, bug titles/bodies, notes
+* Add embeddings later if needed
+
+---
+
+## Prompt 10 — “Resume Where I Left Off”
+
+**Goal:** One command to restore momentum.
+
+Input:
+
+* Project (optional), else most recent
+
+Output:
+
+* Open last 5 files in editor
+* Show current “doing” tasks
+* Display last prompt + response summary
+* Offer one‑click: run tests, start container, open docs
+
+Implementation:
+
+* CLI spawns editor (VS Code/Neovim) with files
+* Prints `vibectl recall --since 1d`
+* Store launch profiles in `~/.vibepilot/profiles.json`
+
+---
+
+## Prompt 11 — Containers and Virtual Desktop
+
+**Goal:** Minimal compose integration now; webtop later.
+
+MVP:
+
+* Per‑project `.vibe/compose.yml`
+  Examples: `web` (Node+Postgres), `ml` (Jupyter), `docs` (MkDocs)
+* Commands: `vibectl container up/down/logs`
+* Log lifecycle to `vp_event(container.start/stop)` with image, ports, env refs
+
+Later:
+
+* Code‑Server / VS Code Web profile
+* Optional “webtop” browser‑based desktop (decoupled; store profile name, ports, env in metadata)
+
+---
+
+## Prompt 12 — Auto‑Documentation
+
+**Goal:** Turn activity into lightweight docs on demand.
+
+Generators:
+
+* `README.sync.md` from tasks + recent commits
+* `CHANGELOG.md` from `git.commit` + task transitions
+* `SESSION_LOGS/YYYY‑MM‑DD.md` timeline linking artifacts and prompt runs
+
+Triggers:
+
+* Manual: `vibectl docs sync`
+* Automatic: on task `done` or git tag
+
+---
+
+## Prompt 13 — Security and Privacy
+
+**Goal:** Local‑first defaults and redaction.
+
+* Local‑only by default
+* `~/.vibepilot/config.yml` redaction rules (secrets, `.env`, keys)
+* LLM proxy enforces request/response redaction before logging
+* Optional sync later (S3, GDrive, Git LFS)
+
+---
+
+## Prompt 14 — Repository Scaffold
+
+**Goal:** Simple monorepo that scales.
+
+```
+vibepilot/
+  apps/
+    api/                # FastAPI (or Express)
+    cli/                # Typer (or oclif)
+    web/                # Vite + React + Tailwind (later)
+  packages/
+    schema/             # Pydantic/Zod models, SQL
+    adapters/           # git, shell, llm, screenshot, docker
+  data/
+    db/                 # SQLite file and migrations
+    artifacts/          # screenshots, notes, blobs
+  .vibe/
+    templates/          # compose.yml samples, doc templates
+  README.md
+```
+
+Language choice:
+
+* Python (Typer + FastAPI) recommended for speed of iteration
+* Node (oclif + Express) acceptable if single runtime is preferred
+
+---
+
+## Prompt 15 — Memory API (HTTP)
+
+**Goal:** Minimum endpoints to power CLI/UI.
+
+* `GET  /health`
+* `GET  /projects`
+* `POST /events`
+* `GET  /recall?project=:id&since=...`
+* `GET  /search?q=...&project=...`
+* `POST /tasks`
+* `PATCH /tasks/:id`
+* `POST /bugs`
+* `POST /prompts`
+* `GET  /prompts?project=:id&since=...`
+* `POST /artifacts`
+
+---
+
+## Prompt 16 — Initial Backlog (Execution‑ready)
+
+Epic A — Core storage and query (2–3 days)
+
+* A1: SQLite schema + migrations
+* A2: FTS5 index and `search()`
+* A3: `recall()` query → summary + next actions
+
+Epic B — Adapters (3–4 days)
+
+* B1: Git post‑commit hook → `vp_event`
+* B2: Shell wrapper `vibectl exec`
+* B3: LLM proxy (OpenAI‑compatible) logging stub
+* B4: Screenshot command (+ optional OCR) + artifact record
+
+Epic C — CLI (2–3 days)
+
+* C1: `init, todo, doing, done, recall, resume, prompt, snap`
+* C2: Markdown export
+
+Epic D — Containers (1–2 days)
+
+* D1: Compose templates + `up/down/logs`
+* D2: Event logging for start/stop
+
+Epic E — UI (2–3 days)
+
+* E1: Vite React app with Timeline, Tasks, Prompts, Artifacts
+* E2: Local auth stub, project switcher
+
+Epic F — Auto‑docs (1 day)
+
+* F1: `docs sync` to generate README/CHANGELOG/session logs
+
+---
+
+## Prompt 17 — Acceptance Tests (Definition of Done)
+
+* `vibectl init demo` creates project row/config
+* Commit to repo → `recall` shows commit with files changed
+* `vibectl todo "Add login"` → `recall` surfaces as next action
+* Call model via proxy → Prompts page shows model, prompt, files in context
+* `vibectl snap` saves PNG, creates artifact; OCR text searchable (if enabled)
+* `vibectl resume` opens last files, prints actionable next steps
+* `vibectl container up web` starts profile and logs events
+* `vibectl docs sync` updates README and CHANGELOG
+
+---
+
+## Prompt 18 — Risks and Mitigations
+
+* Event noise → debounce file watcher, bucket shell commands by session
+* LLM key leakage → redaction rules; keep secrets outside DB
+* Scope creep → stick to MVP boundaries; weekly ship rhythm
+
+---
+
+## Prompt 19 — Build Order (Start Today)
+
+* Scaffold repo (structure above)
+* Define SQL schema + migrations
+* Implement `vibectl` with `init|todo|recall` against DB
+* Git post‑commit adapter; verify in `recall`
+* LLM proxy passthrough stub; log prompt runs
+* Screenshot + artifact ingest
+* `resume` command (open‑file hints)
+* Compose templates + container commands
+* FTS search + thin Web UI (timeline + tasks)
+* Auto‑doc sync
+
+---
+
+## Prompt 20 — Opinionated Simplifications
+
+* Prefer Python (Typer + FastAPI) + SQLite for fast iteration
+* Keep UI thin until CLI + recall feel excellent
+* Add embeddings only after FTS limits are hit
+
+---
+
+## Prompt 21 — Environment Bootstrap (macOS, Local‑first)
+
+**Goal:** Create a reproducible local dev environment.
+
+### Prerequisites
+
+```bash
+xcode-select --install
+# Homebrew (if needed)
+# /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+brew install python sqlite
+# Optional Web UI later:
+brew install node
+# Optional containers (choose one):
+# Docker Desktop: install app manually
+# Orbstack: install app manually
+# Or Colima + docker CLI:
+# brew install colima docker
+```
+
+### Repository layout
+
+```bash
+mkdir -p ~/code && cd ~/code
+mkdir vibepilot && cd vibepilot
+git init
+
+mkdir -p apps/api apps/cli apps/web
+mkdir -p packages/schema packages/adapters
+mkdir -p data/db data/artifacts
+mkdir -p .vibe/templates
+touch README.md .gitignore
+```
+
+### Python project setup (FastAPI + Typer)
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+
+pip install --upgrade pip
+pip install fastapi "uvicorn[standard]" typer[all] rich pydantic sqlalchemy aiosqlite python-dotenv watchdog requests docker
+
+# Dev tools
+pip install black isort ruff mypy pytest httpx
+```
+
+### Makefile
+
+```make
+PY = .venv/bin/python
+PIP = .venv/bin/pip
+
+run-api:
+	. .venv/bin/activate && uvicorn apps.api.main:app --reload --port 8080
+
+lint:
+	. .venv/bin/activate && ruff check .
+
+format:
+	. .venv/bin/activate && ruff check --fix . && black . && isort .
+
+test:
+	. .venv/bin/activate && pytest -q
+```
+
+### .gitignore
+
+```gitignore
+.venv/
+__pycache__/
+*.pyc
+.env
+data/db/*.sqlite*
+data/artifacts/
+node_modules/
+dist/
+```
+
+### .env
+
+```dotenv
+VP_DB_PATH=./data/db/vibepilot.sqlite
+VP_ARTIFACTS_DIR=./data/artifacts
+VP_PORT=8080
+```
+
+### Seed minimal app entry points
+
+FastAPI API:
+
+```python
+# apps/api/main.py
+from fastapi import FastAPI
+
+app = FastAPI(title="VibePilot API")
+
+@app.get("/health")
+def health():
+    return {"ok": True}
+```
+
+Typer CLI:
+
+```python
+# apps/cli/main.py
+import typer
+app = typer.Typer(help="VibePilot CLI")
+
+@app.command()
+def version():
+    typer.echo("VibePilot CLI 0.1.0")
+
+if __name__ == "__main__":
+    app()
+```
+
+Smoke test:
+
+```bash
+make run-api    # visit http://localhost:8080/health
+python apps/cli/main.py version
+```
+
+### Database bootstrap
+
+```bash
+python - <<'PY'
+import os, sqlite3, dotenv
+dotenv.load_dotenv()
+db_path = os.environ.get("VP_DB_PATH", "./data/db/vibepilot.sqlite")
+os.makedirs(os.path.dirname(db_path), exist_ok=True)
+conn = sqlite3.connect(db_path)
+conn.execute("PRAGMA journal_mode=WAL;")
+conn.execute("PRAGMA foreign_keys=ON;")
+print("DB ready at:", db_path)
+conn.close()
+PY
+```
+
+### Optional: Web UI bootstrap
+
+```bash
+cd apps/web
+npm create vite@latest . -- --template react
+npm install
+cd ../..
+```
+
+### Optional: Compose template
+
+```yaml
+# .vibe/templates/compose.web.yml
+services:
+  web:
+    image: node:20
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace
+    command: bash -lc "cd apps/web && npm install && npm run dev -- --host 0.0.0.0"
+    ports:
+      - "5173:5173"
+```
+
+---
+
+## Prompt 22 — Single Copilot/Codex Prompt (Paste at repo root)
+
+```
+You are a senior engineer. Work in this repository to scaffold a local-first “developer memory OS” called VibePilot. The system must capture events (git, shell, LLM prompts, screenshots), store them in SQLite, expose a local HTTP API for recall/search, provide a Typer-based CLI for control, and leave room for a thin React UI. Use Python 3.11+, FastAPI, Typer, SQLite (FTS5), and the existing .venv toolchain.
+
+Goal
+- Implement an append-only event log and normalized tables for tasks, bugs, prompt runs, artifacts, and sessions.
+- Provide a recall query that summarizes “what I was doing” with next actions.
+- Provide a simple LLM proxy stub that logs prompt runs (keys plugged later).
+- Provide a screenshot artifact stub (no OCR yet; record path and metadata).
+- Provide container control stubs that shell out to docker/compose where available.
+- Keep everything local-first and privacy-preserving.
+
+Repository layout (already created)
+- apps/api         FastAPI app (uvicorn entry)
+- apps/cli         Typer CLI
+- apps/web         React (later)
+- packages/schema  Shared models / SQL
+- packages/adapters Adapters for git, shell, llm, screenshot, docker
+- data/db          SQLite file, migrations
+- data/artifacts   Screenshots, notes, blobs
+- .vibe/templates  Compose templates, docs templates
+
+Deliverables
+1) Database schema and migrations
+- Create SQLAlchemy models (or SQL DDL) for:
+  vp_event(id, ts, source, type, project, path, payload_json)
+  vp_task(id, title, status, priority, project, created_at, updated_at, assignee, parent_id, tags_json, links_json)
+  vp_bug(id, title, status, severity, project, created_at, updated_at, repro_steps, links_json)
+  vp_prompt_run(id, ts, model, temperature, project, prompt_text, context_paths_json, response_meta_json, cost_estimate)
+  vp_artifact(id, kind, path, project, created_at, meta_json)
+  vp_session(id, project, started_at, ended_at, summary_text, links_json)
+- Create an FTS5 virtual table or view (vp_search_index) ingesting prompt text, notes, commit messages, bug reports, and artifact annotations.
+- Provide bootstrap code that reads VP_DB_PATH from .env, creates the DB, enables WAL and foreign_keys, and applies migrations.
+
+2) FastAPI endpoints
+- GET /health
+- GET /projects
+- GET /recall?project=:id&since=... → structured session summary, top next actions, last N prompt snippets
+- GET /search?q=...&project=...
+- POST /events
+- POST /tasks, PATCH /tasks/:id
+- POST /bugs
+- POST /prompts
+- POST /artifacts
+
+3) Typer CLI (apps/cli)
+Commands:
+- vibectl init <project>
+- vibectl todo "Title" [--project X]
+- vibectl doing <taskId>, vibectl done <taskId>
+- vibectl recall [--since 2d] [--project X]
+- vibectl resume [--project X]
+- vibectl prompt --model gpt-4o --ctx src/ api/ -- "prompt text" → call local /prompts and persist vp_prompt_run
+- vibectl snap [--note "..."] → create vp_artifact pointing at timestamped path in data/artifacts
+- vibectl container up <profile> / down <profile> / logs <profile> → shell out to docker compose if present; log start/stop events
+
+4) Adapters (packages/adapters)
+- git: post-commit hook code to record vp_event(git.commit) with hash, files, message; write into .git/hooks/post-commit and document enablement
+- shell: wrapper to log commands and exit codes as vp_event(shell.cmd)
+- llm: local proxy/stub recording model, prompt, referenced paths, response_meta_json
+- screenshot: stub to create timestamped file path under data/artifacts and record vp_artifact(kind="screenshot")
+
+5) Recall algorithm
+- Group by project/time window; synthesize vp_session if needed
+- Rank tasks by status (doing > blocked > todo > done) and recency
+- Pull last N prompt runs and artifacts
+- Return JSON: session_summary, next_actions, recent_prompts, recent_artifacts
+
+6) Developer experience
+- Makefile targets to run API and smoke‑test CLI
+- README with DB creation, API run, CLI usage, git hook enablement, artifact storage locations
+
+7) Code quality
+- ruff, black, isort configuration
+- Minimal pytest with one unit test for recall query
+
+Constraints and style
+- Minimal, readable code; straightforward SQL/SQLAlchemy
+- No OCR or external LLM calls yet (stubs only)
+- Single user, local machine; no auth
+
+Acceptance checks
+- make run-api serves GET /health → {"ok": true}
+- vibectl init demo creates a project entry/metadata
+- vibectl todo "Add login" then vibectl recall shows it as next action
+- A dummy prompt run appears in /prompts and in recall results
+- vibectl snap creates an artifact record and path under data/artifacts
+- search returns hits from task titles and prompt text
+- git post-commit appends a git.commit event that appears in recall
+
+Now generate the code and files to satisfy these requirements. Keep outputs confined to this repository.
+```
+
+---
+
+## Prompt 23 — Next Steps
+
+**Goal:** After backend and CLI stabilize, generate a second prompt solely for the React UI (Timeline, Tasks, Prompts, Artifacts, Recall), including API integration stubs, dark‑first theme, and mobile slide‑in navigation.
+
+---
+
+End of pro‑log.
