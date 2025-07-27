@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowAI | The Developer Memory OS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Calm Focus (Teal/Sky with Slate neutrals) -->
+    <!-- Application Structure Plan: The application retains the single-page dashboard structure but is refocused around the FlowAI concept. The navigation is updated to guide users through the Core Idea, Key Features, a new interactive "Flow State" diagram, the updated Architecture, and the new AI Personas. This structure allows a non-linear exploration of the refined concept, with the new "Flow State" section being a central, interactive piece that visually explains the core user experience loop, a key differentiator in the new report. -->
+    <!-- Visualization & Content Choices: 
+        - Core Idea: Goal=Inform. Method=Icon+Text Cards. Justification=Effectively communicates the foundational principles of FlowAI at a glance.
+        - Key Features: Goal=Organize. Method=Interactive Cards. Justification=Provides a clean, structured overview of FlowAI's capabilities.
+        - The Flow State: Goal=Explain Process. Method=HTML/CSS Diagram. Interaction=Hover highlights. Justification=Visually represents the core "Code -> Test -> Reflect -> Document" cycle, which is central to the FlowAI philosophy. This is more effective than a text description.
+        - Architecture: Goal=Inform/Organize. Method=HTML/CSS Diagram + Chart.js Doughnut Chart. Justification=The diagram clarifies the new layered architecture, while the chart offers a quick summary of the updated, more specific tech stack (Tauri, Vector DB).
+        - AI Personas: Goal=Introduce. Method=Card grid. Justification=Presents the different AI agents in a digestible, personable format. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f9ff; /* sky-50 */
+            color: #334155; /* slate-700 */
+        }
+        .font-mono {
+            font-family: 'Roboto Mono', monospace;
+        }
+        .nav-link {
+            transition: all 0.2s ease-in-out;
+            border-bottom: 2px solid transparent;
+        }
+        .nav-link.active, .nav-link:hover {
+            color: #0d9488; /* teal-600 */
+            border-bottom-color: #0d9488; /* teal-600 */
+        }
+        .content-section {
+            display: none;
+        }
+        .content-section.active {
+            display: block;
+        }
+        .flow-step {
+            transition: all 0.3s ease-in-out;
+        }
+        .flow-step:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .chart-container {
+            position: relative;
+            margin: auto;
+            height: 320px;
+            width: 100%;
+            max-width: 320px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+                max-width: 400px;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div id="app" class="min-h-screen flex flex-col">
+        
+        <header class="bg-white/80 backdrop-blur-lg shadow-sm sticky top-0 z-50">
+            <nav class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-16">
+                    <div class="flex items-center">
+                        <span class="text-2xl font-bold text-teal-600">✨ FlowAI</span>
+                    </div>
+                    <div class="hidden md:block">
+                        <div class="ml-10 flex items-baseline space-x-4">
+                            <a href="#idea" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-600">Core Idea</a>
+                            <a href="#features" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-600">Features</a>
+                            <a href="#flow" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-600">The Flow</a>
+                            <a href="#architecture" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-600">Architecture</a>
+                            <a href="#personas" class="nav-link px-3 py-2 rounded-md text-sm font-medium text-slate-600">AI Personas</a>
+                        </div>
+                    </div>
+                    <div class="md:hidden">
+                        <select id="mobile-nav" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-teal-500 focus:border-teal-500 block w-full p-2.5">
+                            <option value="idea">Core Idea</option>
+                            <option value="features">Features</option>
+                            <option value="flow">The Flow</option>
+                            <option value="architecture">Architecture</option>
+                            <option value="personas">AI Personas</option>
+                        </select>
+                    </div>
+                </div>
+            </nav>
+        </header>
+
+        <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12 flex-grow">
+            
+            <section id="idea" class="content-section">
+                <div class="text-center mb-12">
+                    <h1 class="text-4xl md:text-5xl font-extrabold text-slate-800 tracking-tight">The Developer Memory OS</h1>
+                    <p class="mt-4 max-w-3xl mx-auto text-lg text-slate-600">FlowAI is a local-first, privacy-focused system that acts as an extension of your own mind, capturing the context of your work to help you stay in a state of creative flow.</p>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                        <div class="text-3xl mb-3">🧠</div>
+                        <h3 class="text-xl font-semibold text-slate-800">Contextual Memory</h3>
+                        <p class="mt-2 text-slate-500">Automatically captures code diffs, terminal commands, and app interactions to build a rich, queryable memory.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                        <div class="text-3xl mb-3">🔒</div>
+                        <h3 class="text-xl font-semibold text-slate-800">Local-First & Private</h3>
+                        <p class="mt-2 text-slate-500">Your data stays on your machine. No cloud dependencies, no privacy trade-offs. You own your memory.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                        <div class="text-3xl mb-3">🔌</div>
+                        <h3 class="text-xl font-semibold text-slate-800">Tool Agnostic</h3>
+                        <p class="mt-2 text-slate-500">Integrates with your existing tools—VS Code, Obsidian, Docker—without forcing you to change workflows.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                        <div class="text-3xl mb-3">✍️</div>
+                        <h3 class="text-xl font-semibold text-slate-800">Automated Documentation</h3>
+                        <p class="mt-2 text-slate-500">Turns your development activity into draft documentation, changelogs, and ADRs automatically.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                        <div class="text-3xl mb-3">💬</div>
+                        <h3 class="text-xl font-semibold text-slate-800">Conversational Interface</h3>
+                        <p class="mt-2 text-slate-500">Interact with your project's history through natural language. Ask "What was I working on yesterday?".</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md hover:shadow-lg transition-shadow">
+                        <div class="text-3xl mb-3">🧘</div>
+                        <h3 class="text-xl font-semibold text-slate-800">Promotes Deep Work</h3>
+                        <p class="mt-2 text-slate-500">By handling the cognitive load of memory, FlowAI helps you focus on solving complex problems.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="features" class="content-section">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl md:text-4xl font-bold text-slate-800">Key Features</h2>
+                    <p class="mt-3 max-w-2xl mx-auto text-lg text-slate-600">FlowAI provides a suite of powerful features designed to augment your development process seamlessly.</p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="font-semibold text-lg text-teal-700">Real-time Memory Capture</h3>
+                        <p class="mt-2 text-sm text-slate-500">File watcher, process monitor, and clipboard listener build a timeline of your work.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="font-semibold text-lg text-teal-700">Vector-based Recall</h3>
+                        <p class="mt-2 text-sm text-slate-500">Embeds and indexes your activity, allowing for semantic search over your entire history.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="font-semibold text-lg text-teal-700">Auto-generated Summaries</h3>
+                        <p class="mt-2 text-sm text-slate-500">Daily and weekly digests of your progress, ready for stand-ups and reports.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="font-semibold text-lg text-teal-700">Context-aware Prompting</h3>
+                        <p class="mt-2 text-sm text-slate-500">Automatically injects relevant code snippets and history into your LLM prompts.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="font-semibold text-lg text-teal-700">Obsidian Integration</h3>
+                        <p class="mt-2 text-sm text-slate-500">Syncs your development memory with your knowledge base for deeper insights.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md">
+                        <h3 class="font-semibold text-lg text-teal-700">Lightweight Desktop App</h3>
+                        <p class="mt-2 text-sm text-slate-500">A native application built with Tauri ensures minimal resource usage and high performance.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="flow" class="content-section">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl md:text-4xl font-bold text-slate-800">The Flow State Cycle</h2>
+                    <p class="mt-3 max-w-2xl mx-auto text-lg text-slate-600">FlowAI is designed to support the natural, cyclical process of creative development. Hover over a step to learn more.</p>
+                </div>
+                <div class="relative max-w-4xl mx-auto p-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-4">
+                        <div class="flow-step bg-white p-6 rounded-lg shadow-lg border-l-4 border-sky-500">
+                            <h3 class="text-xl font-bold text-sky-700">1. Code</h3>
+                            <p class="mt-2 text-slate-600">Write code, experiment, and build. FlowAI silently observes file changes and terminal commands.</p>
+                        </div>
+                        <div class="flow-step bg-white p-6 rounded-lg shadow-lg border-l-4 border-teal-500">
+                            <h3 class="text-xl font-bold text-teal-700">2. Test</h3>
+                            <p class="mt-2 text-slate-600">Run tests, check outputs, and validate your work. Errors and successes are logged as part of the context.</p>
+                        </div>
+                        <div class="flow-step bg-white p-6 rounded-lg shadow-lg border-l-4 border-emerald-500">
+                            <h3 class="text-xl font-bold text-emerald-700">3. Reflect</h3>
+                            <p class="mt-2 text-slate-600">Query your recent activity. Ask "Why did that test fail?" or "Show me the API I was using."</p>
+                        </div>
+                        <div class="flow-step bg-white p-6 rounded-lg shadow-lg border-l-4 border-indigo-500">
+                            <h3 class="text-xl font-bold text-indigo-700">4. Document</h3>
+                            <p class="mt-2 text-slate-600">Generate a commit message, a changelog entry, or a knowledge base article from the captured flow.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="architecture" class="content-section">
+                 <div class="text-center mb-12">
+                    <h2 class="text-3xl md:text-4xl font-bold text-slate-800">System Architecture</h2>
+                    <p class="mt-3 max-w-2xl mx-auto text-lg text-slate-600">A local-first architecture ensures your data is secure, private, and always available on your machine.</p>
+                </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                    <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-bold text-center text-slate-800 mb-6">System Layers</h3>
+                        <div class="space-y-4 text-center">
+                            <div class="bg-sky-100 text-sky-800 p-3 rounded-lg border border-sky-200">
+                                <p class="font-semibold">Application Layer</p>
+                                <p class="text-sm font-mono">Tauri (Rust + React) / VS Code Ext</p>
+                            </div>
+                            <div class="text-2xl text-slate-400">↓</div>
+                            <div class="bg-teal-100 text-teal-800 p-3 rounded-lg border border-teal-200">
+                                <p class="font-semibold">Service Layer</p>
+                                <p class="text-sm font-mono">Rust Backend / Local LLM Runner</p>
+                            </div>
+                            <div class="text-2xl text-slate-400">↓</div>
+                            <div class="bg-indigo-100 text-indigo-800 p-3 rounded-lg border border-indigo-200">
+                                <p class="font-semibold">Data Layer</p>
+                                <p class="text-sm font-mono">SQLite / Vector DB / File System</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-lg">
+                        <h3 class="text-xl font-bold text-center text-slate-800 mb-6">Tech Stack Distribution</h3>
+                        <div class="chart-container">
+                            <canvas id="techStackChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="personas" class="content-section">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl md:text-4xl font-bold text-slate-800">AI Personas</h2>
+                    <p class="mt-3 max-w-2xl mx-auto text-lg text-slate-600">FlowAI uses specialized agents, or "personas," to handle different aspects of the workflow, ensuring expert assistance for every task.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <h3 class="text-xl font-semibold text-slate-800">Context Agent</h3>
+                        <p class="mt-2 text-slate-500">The core agent that watches your files and actions, building the foundational memory of your work.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <h3 class="text-xl font-semibold text-slate-800">Prompt Agent</h3>
+                        <p class="mt-2 text-slate-500">Enriches your queries to other LLMs with relevant context from your memory, improving response quality.</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <h3 class="text-xl font-semibold text-slate-800">Doc Agent</h3>
+                        <p class="mt-2 text-slate-500">Analyzes your activity timeline to draft documentation, commit messages, and knowledge base articles.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="bg-slate-800 text-slate-400 mt-12">
+            <div class="container mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm">
+                <p>&copy; 2025 FlowAI. A new OS for developer memory.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const navLinks = document.querySelectorAll('.nav-link');
+            const mobileNav = document.getElementById('mobile-nav');
+            const contentSections = document.querySelectorAll('.content-section');
+            let techStackChartInstance = null;
+
+            function setActive(hash) {
+                const targetHash = hash || '#idea';
+
+                navLinks.forEach(link => {
+                    link.classList.toggle('active', link.getAttribute('href') === targetHash);
+                });
+                
+                contentSections.forEach(section => {
+                    section.classList.toggle('active', '#' + section.id === targetHash);
+                });
+
+                if (mobileNav.value !== targetHash.substring(1)) {
+                    mobileNav.value = targetHash.substring(1);
+                }
+
+                if (targetHash === '#architecture' && !techStackChartInstance) {
+                    renderTechStackChart();
+                }
+            }
+
+            function handleNav(e) {
+                e.preventDefault();
+                const hash = e.target.getAttribute('href');
+                window.history.pushState(null, null, hash);
+                setActive(hash);
+            }
+            
+            navLinks.forEach(link => link.addEventListener('click', handleNav));
+            
+            mobileNav.addEventListener('change', (e) => {
+                const hash = '#' + e.target.value;
+                window.history.pushState(null, null, hash);
+                setActive(hash);
+            });
+
+            window.addEventListener('popstate', () => {
+                setActive(window.location.hash || '#idea');
+            });
+            
+            function renderTechStackChart() {
+                const techStackCtx = document.getElementById('techStackChart').getContext('2d');
+                if (techStackCtx) {
+                    techStackChartInstance = new Chart(techStackCtx, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Application (Tauri)', 'Services (Rust)', 'Data (Vector/SQL)'],
+                            datasets: [{
+                                label: 'Tech Stack',
+                                data: [40, 35, 25],
+                                backgroundColor: [
+                                    'rgba(14, 165, 233, 0.7)',  // sky-500
+                                    'rgba(13, 148, 136, 0.7)',  // teal-600
+                                    'rgba(99, 102, 241, 0.7)'   // indigo-500
+                                ],
+                                borderColor: [
+                                    'rgba(14, 165, 233, 1)',
+                                    'rgba(13, 148, 136, 1)',
+                                    'rgba(99, 102, 241, 1)'
+                                ],
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'bottom',
+                                    labels: {
+                                        font: {
+                                            family: "'Inter', sans-serif"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            setActive(window.location.hash);
+        });
+    </script>
+</body>
+</html>
